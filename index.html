@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>公車動態查詢</title>
+<style>
+:root{--bg:#e9eff3;--panel:#fff;--ink:#16252e;--sub:#5d7280;--line:#c5d2da;--led:#ffb000;--ledbg:#1b1408;--route:#0a6e8a;--soon:#d4380d}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1a20;--panel:#172831;--ink:#e6eef2;--sub:#8ea6b3;--line:#2d4452;--route:#4fc3e0;--soon:#ff8a5c}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif}
+main{max-width:520px;margin:0 auto;padding:16px}
+h1{font-size:20px;margin:4px 0 12px}
+form{display:flex;gap:8px;margin-bottom:12px}
+select,input,button{font:inherit;color:var(--ink)}
+select,input{padding:11px 12px;border:2px solid var(--line);border-radius:10px;background:var(--panel)}
+input{flex:1;min-width:0}
+.go{padding:0 18px;border:0;border-radius:10px;background:var(--route);color:#fff;font-weight:700;cursor:pointer}
+:focus-visible{outline:3px solid var(--route);outline-offset:2px}
+details{background:var(--panel);border-radius:10px;padding:10px 14px;margin-bottom:12px}
+summary{cursor:pointer;font-weight:500}
+details input{width:100%;margin-top:8px;flex:none}
+details p{font-size:13px;color:var(--sub);margin:8px 0 0}
+.board{background:var(--ledbg);color:var(--led);border-radius:12px;padding:14px 16px;margin:8px 0 14px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.board b{font-size:30px;letter-spacing:.04em;line-height:1.1}
+.board small{display:block;color:#c58a1a;font-size:13px}
+.board .eta{font-size:28px;font-weight:700;text-align:right;min-width:90px}
+.dir{display:flex;gap:6px;margin-bottom:10px}
+.dir button{flex:1;padding:10px 8px;border:2px solid var(--line);background:var(--panel);border-radius:8px;cursor:pointer}
+.dir button[aria-pressed="true"]{border-color:var(--route);font-weight:700}
+ol{list-style:none;margin:0;padding:0;background:var(--panel);border-radius:12px;overflow:hidden}
+li{display:flex;align-items:center;gap:12px;padding:0 14px;min-height:56px}
+li+li{border-top:1px solid var(--line)}
+.rail{width:18px;align-self:stretch;position:relative;flex:none}
+.rail:before{content:"";position:absolute;left:8px;top:0;bottom:0;width:3px;background:var(--line)}
+li:first-child .rail:before{top:50%}li:last-child .rail:before{bottom:50%}
+.rail i{position:absolute;left:3px;top:calc(50% - 6px);width:13px;height:13px;border-radius:50%;background:var(--panel);border:3px solid var(--route)}
+.rail i.bus{background:var(--soon);border-color:var(--soon);box-shadow:0 0 0 5px color-mix(in srgb,var(--soon) 25%,transparent)}
+.name{flex:1;font-weight:500}
+.tag{min-width:64px;text-align:center;padding:4px 8px;border-radius:6px;background:var(--bg);font-weight:700;font-size:14px}
+.tag.soon{background:var(--soon);color:#fff}
+.tag.none{color:var(--sub);font-weight:400}
+.fav{border:0;background:none;font-size:22px;cursor:pointer;color:var(--sub);padding:6px}
+.fav[aria-pressed="true"]{color:#e0a100}
+.msg{padding:24px;text-align:center;color:var(--sub)}
+.msg.err{color:var(--soon)}
+.meta{font-size:13px;color:var(--sub);text-align:right;margin-top:8px}
+#saved{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.sc{display:inline-flex;border:2px solid var(--line);border-radius:999px;background:var(--panel);overflow:hidden}
+.sc.on{border-color:var(--route)}
+.sc button{border:0;background:none;cursor:pointer;padding:6px 12px;font-weight:500}
+.sc .rm{padding:6px 10px 6px 0;color:var(--sub)}
+.savebtn{display:block;width:100%;margin-bottom:8px;padding:10px;border:2px dashed var(--line);border-radius:10px;background:none;cursor:pointer;font-weight:500}
+.savebtn[aria-pressed="true"]{border-style:solid;border-color:var(--route)}
+</style>
+</head>
+<body>
+<main>
+  <h1>公車動態查詢</h1>
+  <details id="cred">
+    <summary>TDX 金鑰設定</summary>
+    <input id="cid" placeholder="client_id" autocomplete="off" name="tdx-id" aria-label="client_id">
+    <input id="csec" type="password" placeholder="client_secret" autocomplete="new-password" name="tdx-secret" aria-label="client_secret">
+    <p>金鑰只會存在這個瀏覽器的 localStorage，請勿把此檔案連同金鑰分享或公開部署。</p>
+  </details>
+  <form id="f">
+    <select id="city" aria-label="縣市">
+      <option value="Taipei">台北</option><option value="NewTaipei">新北</option><option value="Taoyuan">桃園</option>
+      <option value="Taichung">台中</option><option value="Tainan">台南</option><option value="Kaohsiung">高雄</option>
+      <option value="Keelung">基隆</option><option value="Hsinchu">新竹市</option><option value="HsinchuCounty">新竹縣</option>
+      <option value="MiaoliCounty">苗栗</option><option value="ChanghuaCounty">彰化</option><option value="NantouCounty">南投</option>
+      <option value="YunlinCounty">雲林</option><option value="Chiayi">嘉義市</option><option value="ChiayiCounty">嘉義縣</option>
+      <option value="PingtungCounty">屏東</option><option value="YilanCounty">宜蘭</option><option value="HualienCounty">花蓮</option>
+      <option value="TaitungCounty">台東</option>
+    </select>
+    <input id="route" placeholder="路線，例如 307" aria-label="路線名稱" autocomplete="off" required>
+    <button class="go" type="submit">查詢</button>
+  </form>
+  <div id="saved" aria-label="已儲存的路線"></div>
+  <div id="view"><div class="msg">先填入 TDX 金鑰，再選縣市、輸入路線後按「查詢」。</div></div>
+</main>
+<script>
+var BASE = "https://tdx.transportdata.tw/api/basic/v2/Bus";
+var TOKEN_URL = "https://tdx.transportdata.tw/auth/realms/TDXConnect/protocol/openid-connect/token";
+var S = { city: "Taipei", route: "", dir: "0", data: null, favs: {}, saved: [], timer: null, token: null, exp: 0, stops: {}, cid: "", csec: "" };
+var $ = function (id) { return document.getElementById(id); };
+try {
+  var p = JSON.parse(localStorage.getItem("busprefs") || "{}");
+  if (p.city) S.city = p.city; if (p.route) S.route = p.route;
+  S.favs = p.favs || {}; S.saved = p.saved || []; S.cid = p.cid || ""; S.csec = p.csec || "";
+} catch (e) {}
+function save() { try { localStorage.setItem("busprefs", JSON.stringify({ city: S.city, route: S.route, favs: S.favs, saved: S.saved, cid: S.cid, csec: S.csec })); } catch (e) {} }
+function esc(s) { var d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+
+async function getToken() {
+  if (S.token && Date.now() < S.exp) return S.token;
+  var r = await fetch(TOKEN_URL, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ grant_type: "client_credentials", client_id: S.cid, client_secret: S.csec })
+  });
+  if (!r.ok) {
+    var detail = ""; try { var ej = await r.json(); detail = (ej.error || "") + (ej.error_description ? "：" + ej.error_description : ""); } catch (x) {}
+    throw new Error("取得 token 失敗（" + r.status + "）" + (detail ? "，伺服器回應：" + detail : "") + "。請檢查 client_id 與 client_secret");
+  }
+  var j = await r.json();
+  S.token = j.access_token; S.exp = Date.now() + (j.expires_in - 60) * 1000;
+  return S.token;
+}
+async function tdx(kind) {
+  var filter = "RouteName/Zh_tw eq '" + S.route + "'";
+  var url = BASE + "/" + kind + "/City/" + S.city + "/" + encodeURIComponent(S.route) + "?$filter=" + encodeURIComponent(filter) + "&$format=JSON";
+  var r = await fetch(url, { headers: { authorization: "Bearer " + (await getToken()) } });
+  if (r.status === 401) S.token = null;
+  if (!r.ok) { var er = new Error(kind + " 回應 " + r.status); er.status = r.status; throw er; }
+  return r.json();
+}
+
+function build(stopsData, etaData, nearData) {
+  var dirs = {};
+  [0, 1].forEach(function (d) {
+    var c = stopsData.filter(function (x) { return x.Direction === d; });
+    if (!c.length) return;
+    var main = c.reduce(function (a, b) { return b.Stops.length > a.Stops.length ? b : a; });
+    var etas = {};
+    etaData.forEach(function (e) {
+      if (e.Direction !== d) return;
+      var cur = etas[e.StopUID];
+      if (!cur || (e.EstimateTime != null && (cur.EstimateTime == null || e.EstimateTime < cur.EstimateTime))) etas[e.StopUID] = e;
+    });
+    dirs[d] = main.Stops.slice().sort(function (a, b) { return a.StopSequence - b.StopSequence; }).map(function (s) {
+      var e = etas[s.StopUID] || {};
+      return { uid: s.StopUID, name: s.StopName.Zh_tw, eta: e.EstimateTime == null ? null : e.EstimateTime, status: e.StopStatus == null ? null : e.StopStatus };
+    });
+  });
+  var buses = nearData.map(function (b) { return { dir: b.Direction, uid: b.StopUID }; });
+  return { dirs: dirs, buses: buses, updated: new Date().toISOString() };
+}
+
+function fmt(s) {
+  if (s.eta != null && (s.status === 0 || s.status == null)) {
+    return s.eta <= 60 ? { t: "進站中", c: "soon" } : { t: Math.ceil(s.eta / 60) + " 分", c: s.eta <= 300 ? "soon" : "" };
+  }
+  var m = { 1: "尚未發車", 2: "不停靠", 3: "末班已過", 4: "今日未營運" };
+  return { t: m[s.status] || "無資料", c: "none" };
+}
+
+async function load(spin) {
+  if (spin) $("view").innerHTML = '<div class="msg">載入中…</div>';
+  try {
+    var key = S.city + "|" + S.route;
+    if (!S.stops[key]) S.stops[key] = await tdx("StopOfRoute");
+    if (!S.stops[key].length) throw new Error("找不到這條路線，請確認縣市與路線名稱");
+    var res = [await tdx("EstimatedTimeOfArrival"), await tdx("RealTimeNearStop").catch(function () { return []; })];
+    S.delay = 30000;
+    S.data = build(S.stops[key], res[0], res[1]);
+    if (!S.data.dirs[S.dir]) S.dir = Object.keys(S.data.dirs)[0];
+    render();
+  } catch (e) {
+    S.data = null;
+    if (e.status === 429) { S.delay = Math.min((S.delay || 30000) * 2, 240000); }
+    var msg = e.status === 429 ? "TDX 回應請求過於頻繁（429），已自動放慢更新，約 " + Math.round(S.delay / 1000) + " 秒後再試。請確認沒有同時開多個分頁。" : e instanceof TypeError ? "連線失敗，可能是網路問題或瀏覽器的 CORS 限制。若持續發生，請改用 server.js 版本。" : e.message;
+    $("view").innerHTML = '<div class="msg err">' + esc(msg) + "</div>";
+  }
+}
+
+function cityName(c) { var o = $("city").querySelector('option[value="' + c + '"]'); return o ? o.textContent : c; }
+function savedIdx() { return S.saved.findIndex(function (x) { return x.city === S.city && x.route === S.route; }); }
+function renderSaved() {
+  var el = $("saved");
+  el.innerHTML = S.saved.map(function (x, i) {
+    var on = x.city === S.city && x.route === S.route;
+    return '<span class="sc' + (on ? " on" : "") + '"><button class="pick" data-i="' + i + '">' + esc(cityName(x.city)) + " " + esc(x.route) +
+      '</button><button class="rm" data-i="' + i + '" aria-label="移除 ' + esc(x.route) + '">×</button></span>';
+  }).join("");
+  el.querySelectorAll(".pick").forEach(function (b) { b.onclick = function () { var x = S.saved[b.dataset.i]; $("city").value = x.city; $("route").value = x.route; $("f").requestSubmit(); }; });
+  el.querySelectorAll(".rm").forEach(function (b) { b.onclick = function () { S.saved.splice(b.dataset.i, 1); save(); if (S.data) render(); else renderSaved(); }; });
+}
+function render() {
+  var d = S.data; if (!d) return;
+  var keys = Object.keys(d.dirs), stops = d.dirs[S.dir];
+  var fk = S.city + "|" + S.route, fu = S.favs[fk];
+  var idx = Math.max(0, stops.findIndex(function (s) { return s.uid === fu; }));
+  var e = fmt(stops[idx]);
+  var h = '<button class="savebtn" id="sv" aria-pressed="' + (savedIdx() >= 0) + '">' + (savedIdx() >= 0 ? "★ 已儲存此路線（點一下取消）" : "☆ 儲存此路線") + '</button><div class="board"><div><b>' + esc(S.route) + "</b><small>" + (fu ? "收藏站牌" : "首站") + "：" + esc(stops[idx].name) +
+    '</small></div><div class="eta">' + e.t + "</div></div>";
+  h += '<div class="dir">' + keys.map(function (k) {
+    return '<button data-d="' + k + '" aria-pressed="' + (k === S.dir) + '">往 ' + esc(d.dirs[k][d.dirs[k].length - 1].name) + "</button>";
+  }).join("") + "</div><ol>";
+  var here = {}; d.buses.forEach(function (b) { if (String(b.dir) === S.dir) here[b.uid] = true; });
+  stops.forEach(function (s) {
+    var x = fmt(s);
+    h += '<li><span class="rail"><i class="' + (here[s.uid] ? "bus" : "") + '"></i></span><span class="name">' + esc(s.name) +
+      '</span><span class="tag ' + x.c + '">' + x.t + '</span><button class="fav" data-u="' + esc(s.uid) + '" aria-label="收藏 ' + esc(s.name) +
+      '" aria-pressed="' + (fu === s.uid) + '">' + (fu === s.uid ? "★" : "☆") + "</button></li>";
+  });
+  h += '</ol><div class="meta">更新於 ' + new Date(d.updated).toLocaleTimeString("zh-TW") + "，每 30 秒自動更新</div>";
+  $("view").innerHTML = h;
+  $("sv").onclick = function () { var i = savedIdx(); if (i >= 0) S.saved.splice(i, 1); else S.saved.push({ city: S.city, route: S.route }); save(); render(); };
+  renderSaved();
+  $("view").querySelectorAll(".dir button").forEach(function (b) { b.onclick = function () { S.dir = b.dataset.d; render(); }; });
+  $("view").querySelectorAll(".fav").forEach(function (b) {
+    b.onclick = function () { if (S.favs[fk] === b.dataset.u) delete S.favs[fk]; else S.favs[fk] = b.dataset.u; save(); render(); };
+  });
+}
+
+$("f").addEventListener("submit", function (ev) {
+  ev.preventDefault();
+  var cid = $("cid").value.trim(), csec = $("csec").value.trim();
+  if (cid !== S.cid || csec !== S.csec) { S.token = null; }
+  S.cid = cid; S.csec = csec;
+  if (!cid || !csec) { $("cred").open = true; $("view").innerHTML = '<div class="msg err">請先填入 TDX 金鑰。</div>'; return; }
+  S.city = $("city").value; S.route = $("route").value.trim().replace(/'/g, ""); S.dir = "0"; save();
+  clearTimeout(S.timer); S.delay = 30000; (function loop(first) { load(first).then(function () { S.timer = setTimeout(function () { loop(false); }, S.delay); }); })(true);
+});
+$("city").value = S.city; $("route").value = S.route; $("cid").value = S.cid; $("csec").value = S.csec;
+renderSaved();
+if (!S.cid) $("cred").open = true;
+else if (S.route) $("f").requestSubmit();
+</script>
+</body>
+</html>
